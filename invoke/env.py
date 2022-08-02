@@ -75,8 +75,7 @@ class Environment(object):
                         err = "Found >1 source for {}"
                         raise AmbiguousEnvVar(err.format(key))
                 # Merge and continue
-                new_vars.update(crawled)
-        # Other -> is leaf, no recursion
+                new_vars |= crawled
         else:
             new_vars[self._to_env_var(key_path)] = key_path
         return new_vars
@@ -107,9 +106,7 @@ class Environment(object):
     def _cast(self, old, new_):
         if isinstance(old, bool):
             return new_ not in ("0", "")
-        elif isinstance(old, six.string_types):
-            return new_
-        elif old is None:
+        elif isinstance(old, six.string_types) or old is None:
             return new_
         elif isinstance(old, (list, tuple)):
             err = "Can't adapt an environment string into a {}!"

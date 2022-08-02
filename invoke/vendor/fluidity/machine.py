@@ -129,20 +129,28 @@ class StateMachine(StateMachineBase):
         return list(filter(lambda transition: transition.event == name, self._transitions))
 
     def _ensure_from_validity(self, transitions):
-        valid_transitions = list(filter(
-          lambda transition: transition.is_valid_from(self._current_state_object),
-          transitions))
-        if len(valid_transitions) == 0:
-            raise InvalidTransition("Cannot %s from %s" % (
-                transitions[0].event, self.current_state))
-        return valid_transitions
+        if valid_transitions := list(
+            filter(
+                lambda transition: transition.is_valid_from(
+                    self._current_state_object
+                ),
+                transitions,
+            )
+        ):
+            return valid_transitions
+        else:
+            raise InvalidTransition(
+                f"Cannot {transitions[0].event} from {self.current_state}"
+            )
 
     def _check_guards(self, transitions):
-        allowed_transitions = []
-        for transition in transitions:
-            if transition.check_guard(self):
-                allowed_transitions.append(transition)
-        if len(allowed_transitions) == 0:
+        allowed_transitions = [
+            transition
+            for transition in transitions
+            if transition.check_guard(self)
+        ]
+
+        if not allowed_transitions:
             raise GuardNotSatisfied("Guard is not satisfied for this transition")
         elif len(allowed_transitions) > 1:
             raise ForkedTransition("More than one transition was allowed for this event")
@@ -161,7 +169,8 @@ class _Transition(object):
     def event_method(self):
         def generated_event(machine, *args, **kwargs):
             these_transitions = machine._process_transitions(self.event, *args, **kwargs)
-        generated_event.__doc__ = 'event %s' % self.event
+
+        generated_event.__doc__ = f'event {self.event}'
         generated_event.__name__ = self.event
         return generated_event
 
@@ -195,11 +204,10 @@ class _Guard(object):
     def _evaluate(self, machine, item):
         if callable(item):
             return item(machine)
-        else:
-            guard = getattr(machine, item)
-            if callable(guard):
-                guard = guard()
-            return guard
+        guard = getattr(machine, item)
+        if callable(guard):
+            guard = guard()
+        return guard
 
 
 class _State(object):
@@ -210,7 +218,7 @@ class _State(object):
         self.exit = exit
 
     def getter_name(self):
-        return 'is_%s' % self.name
+        return f'is_{self.name}'
 
     def getter_method(self):
         def state_getter(self_machine):

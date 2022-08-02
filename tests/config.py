@@ -27,7 +27,7 @@ TYPES = ("yaml", "yml", "json", "python")
 
 
 def _load(kwarg, type_, **kwargs):
-    path = join(CONFIGS_PATH, type_ + "/")
+    path = join(CONFIGS_PATH, f"{type_}/")
     kwargs[kwarg] = path
     return Config(**kwargs)
 
@@ -586,7 +586,7 @@ Valid real attributes: ['clear', 'clone', 'env_prefix', 'file_prefix', 'from_dat
             c = Config()
             assert c._project_path is None
             c.load_project()
-            assert list(c._project.keys()) == []
+            assert not list(c._project.keys())
             defaults = ["tasks", "run", "runners", "sudo", "timeouts"]
             assert set(c.keys()) == set(defaults)
 
@@ -626,7 +626,7 @@ Valid real attributes: ['clear', 'clone', 'env_prefix', 'file_prefix', 'from_dat
             assert c.outer.inner.hooray == "python"
             # Real test that builtins, etc are stripped out
             for special in ("builtins", "file", "package", "name", "doc"):
-                assert "__{}__".format(special) not in c
+                assert f"__{special}__" not in c
 
         def python_modules_except_usefully_on_unpicklable_modules(self):
             # Re: #556; when bug present, a TypeError pops up instead (granted,
@@ -1022,7 +1022,7 @@ Valid real attributes: ['clear', 'clone', 'env_prefix', 'file_prefix', 'from_dat
             # one time" (since assert_calls_with gets mad about other
             # invocations w/ different args)
             calls = load_yaml.call_args_list
-            my_call = call("{}invoke.yaml".format(path))
+            my_call = call(f"{path}invoke.yaml")
             try:
                 calls.remove(my_call)
                 assert my_call not in calls

@@ -15,7 +15,7 @@ from ..util import debug, task_name_sort_key
 def complete(names, core, initial_context, collection):
     # Strip out program name (scripts give us full command line)
     # TODO: this may not handle path/to/script though?
-    invocation = re.sub(r"^({}) ".format("|".join(names)), "", core.remainder)
+    invocation = re.sub(f'^({"|".join(names)}) ', "", core.remainder)
     debug("Completing for invocation: {!r}".format(invocation))
     # Tokenize (shlex will have to do)
     tokens = shlex.split(invocation)
@@ -40,10 +40,7 @@ def complete(names, core, initial_context, collection):
             contexts = [e.context]
         # Fall back to core context if no context seen.
         debug("Parsed invocation, contexts: {!r}".format(contexts))
-        if not contexts or not contexts[-1]:
-            context = initial_context
-        else:
-            context = contexts[-1]
+        context = initial_context if not contexts or not contexts[-1] else contexts[-1]
         debug("Selected context: {!r}".format(context))
         # Unknown flags (could be e.g. only partially typed out; could be
         # wholly invalid; doesn't matter) complete with flags.
@@ -56,30 +53,14 @@ def complete(names, core, initial_context, collection):
                     lambda x: x.startswith("--"), context.flag_names()
                 ):
                     print(name)
-            # Just a dash, completes with all flags
             elif tail == "-":
                 for name in context.flag_names():
                     print(name)
-            # Otherwise, it's something entirely invalid (a shortflag not
-            # recognized, or a java style flag like -foo) so return nothing
-            # (the shell will still try completing with files, but that doesn't
-            # hurt really.)
-            else:
-                pass
-        # Known flags complete w/ nothing or tasks, depending
+        elif context.flags[tail].takes_value:
+            debug("Found, and it takes a value, so no completion")
         else:
-            # Flags expecting values: do nothing, to let default (usually
-            # file) shell completion occur (which we actively want in this
-            # case.)
-            if context.flags[tail].takes_value:
-                debug("Found, and it takes a value, so no completion")
-                pass
-            # Not taking values (eg bools): print task names
-            else:
-                debug("Found, takes no value, printing task names")
-                print_task_names(collection)
-    # If not a flag, is either task name or a flag value, so just complete
-    # task names.
+            debug("Found, takes no value, printing task names")
+            print_task_names(collection)
     else:
         debug("Last token isn't flag-like, just printing task names")
         print_task_names(collection)
@@ -111,7 +92,7 @@ def print_completion_script(shell, names):
     except KeyError:
         err = 'Completion for shell "{}" not supported (options are: {}).'
         raise ParseError(err.format(shell, ", ".join(sorted(completions))))
-    debug("Printing completion script from {}".format(path))
+    debug(f"Printing completion script from {path}")
     # Choose one arbitrary program name for script's own internal invocation
     # (also used to construct completion function names when necessary)
     binary = names[0]

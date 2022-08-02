@@ -32,7 +32,7 @@ class Mark:
                 break
         snippet = self.buffer[start:end]
         return ' '*indent + head + snippet + tail + '\n'  \
-                + ' '*(indent+self.pointer-start+len(head)) + '^'
+                    + ' '*(indent+self.pointer-start+len(head)) + '^'
 
     def __str__(self):
         snippet = self.get_snippet()

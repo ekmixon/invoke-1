@@ -48,7 +48,7 @@ def pty_size():
 
     .. versionadded:: 1.0
     """
-    cols, rows = _pty_size() if not WINDOWS else _win_pty_size()
+    cols, rows = _win_pty_size() if WINDOWS else _pty_size()
     # TODO: make defaults configurable?
     return ((cols or 80), (rows or 24))
 
@@ -59,8 +59,6 @@ def _pty_size():
 
     .. versionadded:: 1.0
     """
-    # Sentinel values to be replaced w/ defaults by caller
-    size = (None, None)
     # We want two short unsigned integers (rows, cols)
     fmt = "HH"
     # Create an empty (zeroed) buffer for ioctl to map onto. Yay for C!
@@ -82,10 +80,11 @@ def _pty_size():
     #   something unpack can deal with
     except (struct.error, TypeError, IOError, AttributeError):
         pass
-    return size
+    return None, None
 
 
 def _win_pty_size():
+
     class CONSOLE_SCREEN_BUFFER_INFO(Structure):
         _fields_ = [
             ("dwSize", _COORD),
@@ -105,9 +104,7 @@ def _win_pty_size():
 
     hstd = GetStdHandle(-11)  # STD_OUTPUT_HANDLE = -11
     csbi = CONSOLE_SCREEN_BUFFER_INFO()
-    ret = GetConsoleScreenBufferInfo(hstd, byref(csbi))
-
-    if ret:
+    if ret := GetConsoleScreenBufferInfo(hstd, byref(csbi)):
         sizex = csbi.srWindow.Right - csbi.srWindow.Left + 1
         sizey = csbi.srWindow.Bottom - csbi.srWindow.Top + 1
         return sizex, sizey
@@ -134,9 +131,11 @@ def stdin_is_foregrounded_tty(stream):
 
     .. versionadded:: 1.0
     """
-    if not has_fileno(stream):
-        return False
-    return os.getpgrp() == os.tcgetpgrp(stream.fileno())
+    return (
+        os.getpgrp() == os.tcgetpgrp(stream.fileno())
+        if has_fileno(stream)
+        else False
+    )
 
 
 def cbreak_already_set(stream):
@@ -204,9 +203,8 @@ def ready_for_reading(input_):
         return True
     if WINDOWS:
         return msvcrt.kbhit()
-    else:
-        reads, _, _ = select.select([input_], [], [], 0.0)
-        return bool(reads and reads[0] is input_)
+    reads, _, _ = select.select([input_], [], [], 0.0)
+    return bool(reads and reads[0] is input_)
 
 
 def bytes_to_read(input_):

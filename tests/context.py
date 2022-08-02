@@ -597,9 +597,7 @@ class MockContext_:
             assert mc.run("bar").stdout == "bar"
 
     class commands_injected_into_Result:
-        @mark.parametrize(
-            "kwargs", (dict(), dict(command=""), dict(command=None))
-        )
+        @mark.parametrize("kwargs", ({}, dict(command=""), dict(command=None)))
         def when_not_set_or_falsey(self, kwargs):
             c = MockContext(run={"foo": Result("bar", **kwargs)})
             assert c.run("foo").command == "foo"

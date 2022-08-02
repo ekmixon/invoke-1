@@ -458,8 +458,11 @@ class Runner_:
             try:
                 self._run(_, hide=value)
             except ValueError as e:
-                msg = "Error from run(hide=xxx) did not tell user what the bad value was!"  # noqa
-                msg += "\nException msg: {}".format(e)
+                msg = (
+                    "Error from run(hide=xxx) did not tell user what the bad value was!"
+                    + f"\nException msg: {e}"
+                )
+
                 assert value in str(e), msg
             else:
                 assert (

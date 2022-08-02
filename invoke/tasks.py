@@ -91,26 +91,20 @@ class Task(object):
         return self._name or self.__name__
 
     def __repr__(self):
-        aliases = ""
-        if self.aliases:
-            aliases = " ({})".format(", ".join(self.aliases))
+        aliases = f' ({", ".join(self.aliases)})' if self.aliases else ""
         return "<Task {!r}{}>".format(self.name, aliases)
 
     def __eq__(self, other):
         if self.name != other.name:
             return False
-        # Functions do not define __eq__ but func_code objects apparently do.
-        # (If we're wrapping some other callable, they will be responsible for
-        # defining equality on their end.)
         if self.body == other.body:
             return True
-        else:
-            try:
-                return six.get_function_code(
-                    self.body
-                ) == six.get_function_code(other.body)
-            except AttributeError:
-                return False
+        try:
+            return six.get_function_code(
+                self.body
+            ) == six.get_function_code(other.body)
+        except AttributeError:
+            return False
 
     def __hash__(self):
         # Presumes name and body will never be changed. Hrm.
@@ -176,11 +170,11 @@ class Task(object):
         return positional
 
     def arg_opts(self, name, default, taken_names):
-        opts = {}
-        # Whether it's positional or not
-        opts["positional"] = name in self.positional
-        # Whether it is a value-optional flag
-        opts["optional"] = name in self.optional
+        opts = {
+            "positional": name in self.positional,
+            "optional": name in self.optional,
+        }
+
         # Whether it should be of an iterable (list) kind
         if name in self.iterable:
             opts["kind"] = list
@@ -201,7 +195,7 @@ class Task(object):
         if self.auto_shortflags:
             # Must know what short names are available
             for char in name:
-                if not (char == name or char in taken_names):
+                if char != name and char not in taken_names:
                     names.append(char)
                     break
         opts["names"] = names
@@ -250,10 +244,9 @@ class Task(object):
         # the user messed up & had a typo or similar. Let's explode.
         if self.help:
             raise ValueError(
-                "Help field was set for param(s) that don't exist: {}".format(
-                    list(self.help.keys())
-                )
+                f"Help field was set for param(s) that don't exist: {list(self.help.keys())}"
             )
+
         # Now we need to ensure positionals end up in the front of the list, in
         # order given in self.positionals, so that when Context consumes them,
         # this order is preserved.
@@ -401,7 +394,7 @@ class Call(object):
         self.task = task
         self.called_as = called_as
         self.args = args or tuple()
-        self.kwargs = kwargs or dict()
+        self.kwargs = kwargs or {}
 
     # TODO: just how useful is this? feels like maybe overkill magic
     def __getattr__(self, name):
@@ -423,14 +416,10 @@ class Call(object):
         )
 
     def __eq__(self, other):
-        # NOTE: Not comparing 'called_as'; a named call of a given Task with
-        # same args/kwargs should be considered same as an unnamed call of the
-        # same Task with the same args/kwargs (e.g. pre/post task specified w/o
-        # name). Ditto tasks with multiple aliases.
-        for attr in "task args kwargs".split():
-            if getattr(self, attr) != getattr(other, attr):
-                return False
-        return True
+        return all(
+            getattr(self, attr) == getattr(other, attr)
+            for attr in "task args kwargs".split()
+        )
 
     def make_context(self, config):
         """

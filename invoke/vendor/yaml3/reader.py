@@ -33,13 +33,13 @@ class ReaderError(YAMLError):
     def __str__(self):
         if isinstance(self.character, bytes):
             return "'%s' codec can't decode byte #x%02x: %s\n"  \
-                    "  in \"%s\", position %d"    \
-                    % (self.encoding, ord(self.character), self.reason,
+                        "  in \"%s\", position %d"    \
+                        % (self.encoding, ord(self.character), self.reason,
                             self.name, self.position)
         else:
             return "unacceptable character #x%04x: %s\n"    \
-                    "  in \"%s\", position %d"    \
-                    % (self.character, self.reason,
+                        "  in \"%s\", position %d"    \
+                        % (self.character, self.reason,
                             self.name, self.position)
 
 class Reader(object):
@@ -136,8 +136,7 @@ class Reader(object):
 
     NON_PRINTABLE = re.compile('[^\x09\x0A\x0D\x20-\x7E\x85\xA0-\uD7FF\uE000-\uFFFD]')
     def check_printable(self, data):
-        match = self.NON_PRINTABLE.search(data)
-        if match:
+        if match := self.NON_PRINTABLE.search(data):
             character = match.group()
             position = self.index+(len(self.buffer)-self.pointer)+match.start()
             raise ReaderError(self.name, position, ord(character),

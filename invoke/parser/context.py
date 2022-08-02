@@ -14,9 +14,7 @@ def translate_underscores(name):
 
 def to_flag(name):
     name = translate_underscores(name)
-    if len(name) == 1:
-        return "-" + name
-    return "--" + name
+    return f"-{name}" if len(name) == 1 else f"--{name}"
 
 
 def sort_candidate(arg):
@@ -24,7 +22,7 @@ def sort_candidate(arg):
     # TODO: is there no "split into two buckets on predicate" builtin?
     shorts = {x for x in names if len(x.strip("-")) == 1}
     longs = {x for x in names if x not in shorts}
-    return sorted(shorts if shorts else longs)[0]
+    return sorted(shorts or longs)[0]
 
 
 def flag_key(x):
@@ -33,22 +31,14 @@ def flag_key(x):
 
     .. versionadded:: 1.0
     """
-    # Setup
-    ret = []
     x = sort_candidate(x)
-    # Long-style flags win over short-style ones, so the first item of
-    # comparison is simply whether the flag is a single character long (with
-    # non-length-1 flags coming "first" [lower number])
-    ret.append(1 if len(x) == 1 else 0)
-    # Next item of comparison is simply the strings themselves,
-    # case-insensitive. They will compare alphabetically if compared at this
-    # stage.
-    ret.append(x.lower())
+    ret = [1 if len(x) == 1 else 0, x.lower()]
     # Finally, if the case-insensitive test also matched, compare
     # case-sensitive, but inverse (with lowercase letters coming first)
-    inversed = ""
-    for char in x:
-        inversed += char.lower() if char.isupper() else char.upper()
+    inversed = "".join(
+        char.lower() if char.isupper() else char.upper() for char in x
+    )
+
     ret.append(inversed)
     return ret
 
@@ -92,12 +82,10 @@ class ParserContext(object):
             self.add_arg(arg)
 
     def __repr__(self):
-        aliases = ""
-        if self.aliases:
-            aliases = " ({})".format(", ".join(self.aliases))
+        aliases = f' ({", ".join(self.aliases)})' if self.aliases else ""
         name = (" {!r}{}".format(self.name, aliases)) if self.name else ""
         args = (": {!r}".format(self.args)) if self.args else ""
-        return "<parser/Context{}{}>".format(name, args)
+        return f"<parser/Context{name}{args}>"
 
     def add_arg(self, *args, **kwargs):
         """
@@ -145,7 +133,7 @@ class ParserContext(object):
             # Invert the 'main' flag name here, which will be a dashed version
             # of the primary argument name if underscore-to-dash transformation
             # occurred.
-            inverse_name = to_flag("no-{}".format(main))
+            inverse_name = to_flag(f"no-{main}")
             self.inverse_flags[inverse_name] = to_flag(main)
 
     @property
@@ -162,10 +150,7 @@ class ParserContext(object):
 
         .. versionadded:: 1.0
         """
-        ret = {}
-        for arg in self.args.values():
-            ret[arg.name] = arg.value
-        return ret
+        return {arg.name: arg.value for arg in self.args.values()}
 
     def names_for(self, flag):
         # TODO: should probably be a method on Lexicon/AliasDict
@@ -191,17 +176,17 @@ class ParserContext(object):
                 # Short flags are -f VAL, long are --foo=VAL
                 # When optional, also, -f [VAL] and --foo[=VAL]
                 if len(name.strip("-")) == 1:
-                    value_ = ("[{}]".format(value)) if arg.optional else value
-                    valuestr = " {}".format(value_)
+                    value_ = f"[{value}]" if arg.optional else value
+                    valuestr = f" {value_}"
                 else:
-                    valuestr = "={}".format(value)
+                    valuestr = f"={value}"
                     if arg.optional:
-                        valuestr = "[{}]".format(valuestr)
+                        valuestr = f"[{valuestr}]"
             else:
                 # no value => boolean
                 # check for inverse
                 if name in self.inverse_flags.values():
-                    name = "--[no-]{}".format(name[2:])
+                    name = f"--[no-]{name[2:]}"
 
                 valuestr = ""
             # Tack together

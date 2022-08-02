@@ -70,11 +70,10 @@ class Failure(Exception):
             stdout = self.result.tail("stdout")
         if self.result.pty:
             stderr = " n/a (PTYs have no stderr)"
+        elif "stderr" in self.result.hide:
+            stderr = self.result.tail("stderr")
         else:
-            if "stderr" not in self.result.hide:
-                stderr = already_printed
-            else:
-                stderr = self.result.tail("stderr")
+            stderr = already_printed
         return stdout, stderr
 
     def __repr__(self):
@@ -89,9 +88,7 @@ class Failure(Exception):
         template = "<{}: cmd={!r}{}>"
         rest = ""
         if kwargs:
-            rest = " " + " ".join(
-                "{}={}".format(key, value) for key, value in kwargs.items()
-            )
+            rest = (" " + " ".join(f"{key}={value}" for key, value in kwargs.items()))
         return template.format(
             self.__class__.__name__, self.result.command, rest
         )
@@ -345,16 +342,16 @@ class ThreadException(Exception):
         self.exceptions = tuple(exceptions)
 
     def __str__(self):
-        details = []
-        for x in self.exceptions:
-            # Build useful display
-            detail = "Thread args: {}\n\n{}"
-            details.append(
-                detail.format(
-                    pformat(_printable_kwargs(x.kwargs)),
-                    "\n".join(format_exception(x.type, x.value, x.traceback)),
-                )
+        # Build useful display
+        detail = "Thread args: {}\n\n{}"
+        details = [
+            detail.format(
+                pformat(_printable_kwargs(x.kwargs)),
+                "\n".join(format_exception(x.type, x.value, x.traceback)),
             )
+            for x in self.exceptions
+        ]
+
         args = (
             len(self.exceptions),
             ", ".join(x.type.__name__ for x in self.exceptions),

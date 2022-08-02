@@ -454,7 +454,7 @@ class Call_:
 
         class kwargs:
             def defaults_to_empty_dict(self):
-                assert Call(_).kwargs == dict()
+                assert Call(_).kwargs == {}
 
             def may_be_given(self):
                 assert Call(_, kwargs={"foo": "bar"}).kwargs == {"foo": "bar"}

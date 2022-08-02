@@ -18,18 +18,18 @@ if six.PY3:
         from importlib._bootstrap import _SourceFileLoader as SourceFileLoader
 
     def load_source(name, path):
-        if not os.path.exists(path):
-            return {}
-        return vars(SourceFileLoader("mod", path).load_module())
+        return (
+            vars(SourceFileLoader("mod", path).load_module())
+            if os.path.exists(path)
+            else {}
+        )
 
 
 else:
     import imp
 
     def load_source(name, path):
-        if not os.path.exists(path):
-            return {}
-        return vars(imp.load_source("mod", path))
+        return vars(imp.load_source("mod", path)) if os.path.exists(path) else {}
 
 
 class DataProxy(object):
@@ -204,7 +204,7 @@ class DataProxy(object):
             object.__setattr__(self, key, value)
 
     def __repr__(self):
-        return "<{}: {}>".format(self.__class__.__name__, self._config)
+        return f"<{self.__class__.__name__}: {self._config}>"
 
     def __contains__(self, key):
         return key in self._config
@@ -442,14 +442,7 @@ class Config(DataProxy):
         # On Windows, which won't have /bin/bash, check for a set COMSPEC env
         # var (https://en.wikipedia.org/wiki/COMSPEC) or fallback to an
         # unqualified cmd.exe otherwise.
-        if WINDOWS:
-            shell = os.environ.get("COMSPEC", "cmd.exe")
-        # Else, assume Unix, most distros of which have /bin/bash available.
-        # TODO: consider an automatic fallback to /bin/sh for systems lacking
-        # /bin/bash; however users may configure run.shell quite easily, so...
-        else:
-            shell = "/bin/bash"
-
+        shell = os.environ.get("COMSPEC", "cmd.exe") if WINDOWS else "/bin/bash"
         return {
             # TODO: we document 'debug' but it's not truly implemented outside
             # of env var and CLI flag. If we honor it, we have to go around and
@@ -620,7 +613,7 @@ class Config(DataProxy):
         env_prefix = self.env_prefix
         if env_prefix is None:
             env_prefix = self.prefix
-        env_prefix = "{}_".format(env_prefix.upper())
+        env_prefix = f"{env_prefix.upper()}_"
         self._set(_env_prefix=env_prefix)
         # Config data loaded from the shell environment.
         self._set(_env={})
@@ -829,11 +822,7 @@ class Config(DataProxy):
 
         .. versionadded:: 1.0
         """
-        # 'Prefix' to match the other sets of attrs
-        project_prefix = None
-        if path is not None:
-            # Ensure the prefix is normalized to a directory-like path string
-            project_prefix = join(path, "")
+        project_prefix = join(path, "") if path is not None else None
         self._set(_project_prefix=project_prefix)
         # Path to loaded per-project config file, if any.
         self._set(_project_path=None)
@@ -845,9 +834,9 @@ class Config(DataProxy):
 
     def _load_file(self, prefix, absolute=False, merge=True):
         # Setup
-        found = "_{}_found".format(prefix)
-        path = "_{}_path".format(prefix)
-        data = "_{}".format(prefix)
+        found = f"_{prefix}_found"
+        path = f"_{prefix}_path"
+        data = f"_{prefix}"
         midfix = self.file_prefix
         if midfix is None:
             midfix = self.prefix
@@ -862,7 +851,7 @@ class Config(DataProxy):
                 return
             paths = [absolute_path]
         else:
-            path_prefix = getattr(self, "_{}_prefix".format(prefix))
+            path_prefix = getattr(self, f"_{prefix}_prefix")
             # Short circuit if loading seems unnecessary (eg for project config
             # files when not running out of a project)
             if path_prefix is None:
@@ -878,7 +867,7 @@ class Config(DataProxy):
             try:
                 try:
                     type_ = splitext(filepath)[1].lstrip(".")
-                    loader = getattr(self, "_load_{}".format(type_))
+                    loader = getattr(self, f"_load_{type_}")
                 except AttributeError:
                     msg = "Config files of type {!r} (from file {!r}) are not supported! Please use one of: {!r}"  # noqa
                     raise UnknownFileType(
@@ -890,13 +879,11 @@ class Config(DataProxy):
                 self._set(path, filepath)
                 self._set(found, True)
                 break
-            # Typically means 'no such file', so just note & skip past.
             except IOError as e:
-                if e.errno == 2:
-                    err = "Didn't see any {}, skipping."
-                    debug(err.format(filepath))
-                else:
+                if e.errno != 2:
                     raise
+                err = "Didn't see any {}, skipping."
+                debug(err.format(filepath))
         # Still None -> no suffixed paths were found, record this fact
         if getattr(self, path) is None:
             self._set(found, False)
@@ -961,21 +948,19 @@ class Config(DataProxy):
     def _merge_file(self, name, desc):
         # Setup
         desc += " config file"  # yup
-        found = getattr(self, "_{}_found".format(name))
-        path = getattr(self, "_{}_path".format(name))
-        data = getattr(self, "_{}".format(name))
+        found = getattr(self, f"_{name}_found")
+        path = getattr(self, f"_{name}_path")
+        data = getattr(self, f"_{name}")
         # None -> no loading occurred yet
         if found is None:
-            debug("{} has not been loaded yet, skipping".format(desc))
-        # True -> hooray
+            debug(f"{desc} has not been loaded yet, skipping")
         elif found:
             debug("{} ({}): {!r}".format(desc, path, data))
             merge_dicts(self._config, data)
-        # False -> did try, did not succeed
         else:
             # TODO: how to preserve what was tried for each case but only for
             # the negative? Just a branch here based on 'name'?
-            debug("{} not found, skipping".format(desc))
+            debug(f"{desc} not found, skipping")
 
     def clone(self, into=None):
         """
@@ -1054,7 +1039,7 @@ class Config(DataProxy):
             overrides
             modifications
         """.split():
-            name = "_{}".format(name)
+            name = f"_{name}"
             my_data = getattr(self, name)
             # Non-dict data gets carried over straight (via a copy())
             # NOTE: presumably someone could really screw up and change these
@@ -1193,41 +1178,26 @@ def merge_dicts(base, updates):
         # Dict values whose keys also exist in 'base' -> recurse
         # (But only if both types are dicts.)
         if key in base:
-            if isinstance(value, dict):
-                if isinstance(base[key], dict):
-                    merge_dicts(base[key], value)
-                else:
-                    raise _merge_error(base[key], value)
-            else:
-                if isinstance(base[key], dict):
-                    raise _merge_error(base[key], value)
-                # Fileno-bearing objects are probably 'real' files which do not
-                # copy well & must be passed by reference. Meh.
-                elif hasattr(value, "fileno"):
-                    base[key] = value
-                else:
-                    base[key] = copy.copy(value)
-        # New values get set anew
-        else:
-            # Dict values get reconstructed to avoid being references to the
-            # updates dict, which can lead to nasty state-bleed bugs otherwise
-            if isinstance(value, dict):
-                base[key] = copy_dict(value)
-            # Fileno-bearing objects are probably 'real' files which do not
-            # copy well & must be passed by reference. Meh.
+            if isinstance(value, dict) and isinstance(base[key], dict):
+                merge_dicts(base[key], value)
+            elif isinstance(value, dict) or isinstance(base[key], dict):
+                raise _merge_error(base[key], value)
             elif hasattr(value, "fileno"):
                 base[key] = value
-            # Non-dict values just get set straight
             else:
                 base[key] = copy.copy(value)
+        elif isinstance(value, dict):
+            base[key] = copy_dict(value)
+        elif hasattr(value, "fileno"):
+            base[key] = value
+        else:
+            base[key] = copy.copy(value)
     return base
 
 
 def _merge_error(orig, new_):
     return AmbiguousMergeError(
-        "Can't cleanly merge {} with {}".format(
-            _format_mismatch(orig), _format_mismatch(new_)
-        )
+        f"Can't cleanly merge {_format_mismatch(orig)} with {_format_mismatch(new_)}"
     )
 
 

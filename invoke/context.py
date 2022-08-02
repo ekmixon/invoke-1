@@ -55,12 +55,12 @@ class Context(DataProxy):
         #: A list of commands to run (via "&&") before the main argument to any
         #: `run` or `sudo` calls. Note that the primary API for manipulating
         #: this list is `prefix`; see its docs for details.
-        command_prefixes = list()
+        command_prefixes = []
         self._set(command_prefixes=command_prefixes)
         #: A list of directories to 'cd' into before running commands with
         #: `run` or `sudo`; intended for management via `cd`, please see its
         #: docs for details.
-        command_cwds = list()
+        command_cwds = []
         self._set(command_cwds=command_cwds)
 
     @property
@@ -178,28 +178,15 @@ class Context(DataProxy):
         prompt = self.config.sudo.prompt
         password = kwargs.pop("password", self.config.sudo.password)
         user = kwargs.pop("user", self.config.sudo.user)
-        # TODO: allow subclassing for 'get the password' so users who REALLY
-        # want lazy runtime prompting can have it easily implemented.
-        # TODO: want to print a "cleaner" echo with just 'sudo <command>'; but
-        # hard to do as-is, obtaining config data from outside a Runner one
-        # holds is currently messy (could fix that), if instead we manually
-        # inspect the config ourselves that duplicates logic. NOTE: once we
-        # figure that out, there is an existing, would-fail-if-not-skipped test
-        # for this behavior in test/context.py.
-        # TODO: once that is done, though: how to handle "full debug" output
-        # exactly (display of actual, real full sudo command w/ -S and -p), in
-        # terms of API/config? Impl is easy, just go back to passing echo
-        # through to 'run'...
-        user_flags = ""
-        if user is not None:
-            user_flags = "-H -u {} ".format(user)
+        user_flags = f"-H -u {user} " if user is not None else ""
         command = self._prefix_commands(command)
-        cmd_str = "sudo -S -p '{}' {}{}".format(prompt, user_flags, command)
+        cmd_str = f"sudo -S -p '{prompt}' {user_flags}{command}"
         watcher = FailingResponder(
             pattern=re.escape(prompt),
-            response="{}\n".format(password),
+            response=f"{password}\n",
             sentinel="Sorry, try again.\n",
         )
+
         # Ensure we merge any user-specified watchers with our own.
         # NOTE: If there are config-driven watchers, we pull those up to the
         # kwarg level; that lets us merge cleanly without needing complex
@@ -240,9 +227,8 @@ class Context(DataProxy):
         `prefix` context manager.
         """
         prefixes = list(self.command_prefixes)
-        current_directory = self.cwd
-        if current_directory:
-            prefixes.insert(0, "cd {}".format(current_directory))
+        if current_directory := self.cwd:
+            prefixes.insert(0, f"cd {current_directory}")
 
         return " && ".join(prefixes + [command])
 
@@ -486,7 +472,7 @@ class MockContext(Context):
                 err = "Not sure how to yield results from a {!r}"
                 raise TypeError(err.format(type(results)))
             # Save results for use by the method
-            self._set("__{}".format(method), results)
+            self._set(f"__{method}", results)
             # Wrap the method in a Mock, if applicable
             if Mock is not None:
                 self._set(method, Mock(wraps=getattr(self, method)))
@@ -575,7 +561,7 @@ class MockContext(Context):
 
         .. versionadded:: 1.0
         """
-        attname = "__{}".format(attname)
+        attname = f"__{attname}"
         heck = TypeError(
             "Can't update results for non-dict or nonexistent mock results!"
         )

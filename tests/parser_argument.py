@@ -39,7 +39,7 @@ class Argument_:
 
         def shows_useful_info(self):
             arg = Argument(names=("name", "nick1", "nick2"))
-            expected = "<Argument: {} ({})>".format("name", "nick1, nick2")
+            expected = '<Argument: name (nick1, nick2)>'
             assert repr(arg) == expected
 
         def does_not_show_nickname_parens_if_no_nicknames(self):
@@ -165,8 +165,7 @@ class Argument_:
             # of context (as with list-types above.)
             a.value = True
             assert a.value == 1
-            for _ in range(4):
-                a.value = True
+            a.value = True
             assert a.value == 5
 
     class value:

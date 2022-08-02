@@ -19,7 +19,7 @@ from invoke import task
 def check(c):
     count = 0
     failures = []
-    for _ in range(0, 1000):
+    for _ in range(1000):
         count += 1
         try:
             # 'ls' chosen as an arbitrary, fast-enough-for-looping but
@@ -30,5 +30,5 @@ def check(c):
         except Exception as e:
             failures.append(e)
     if failures:
-        print("run() FAILED {}/{} times!".format(len(failures), count))
+        print(f"run() FAILED {len(failures)}/{count} times!")
         sys.exit(1)

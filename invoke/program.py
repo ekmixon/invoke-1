@@ -319,8 +319,7 @@ class Program(object):
         if "no-dedupe" in self.args and self.args["no-dedupe"].value:
             tasks["dedupe"] = False
         timeouts = {}
-        command = self.args["command-timeout"].value
-        if command:
+        if command := self.args["command-timeout"].value:
             timeouts["command"] = command
         # Handle "fill in config values at start of runtime", which for now is
         # just sudo password
@@ -489,16 +488,15 @@ class Program(object):
 
         # Print per-task help, if necessary
         if halp:
-            if halp in self.parser.contexts:
-                msg = "Saw --help <taskname>, printing per-task help & exiting"
-                debug(msg)
-                self.print_task_help(halp)
-                raise Exit
-            else:
+            if halp not in self.parser.contexts:
                 # TODO: feels real dumb to factor this out of Parser, but...we
                 # should?
-                raise ParseError("No idea what '{}' is!".format(halp))
+                raise ParseError(f"No idea what '{halp}' is!")
 
+            msg = "Saw --help <taskname>, printing per-task help & exiting"
+            debug(msg)
+            self.print_task_help(halp)
+            raise Exit
         # Print discovered tasks if necessary
         list_root = self.args.list.value  # will be True or string
         self.list_format = self.args["list-format"].value
@@ -653,13 +651,13 @@ class Program(object):
         return ParserContext(args=args)
 
     def print_version(self):
-        print("{} {}".format(self.name, self.version or "unknown"))
+        print(f'{self.name} {self.version or "unknown"}')
 
     def print_help(self):
         usage_suffix = "task1 [--task1-opts] ... taskN [--taskN-opts]"
         if self.namespace is not None:
             usage_suffix = "<subcommand> [--subcommand-opts] ..."
-        print("Usage: {} [--core-opts] {}".format(self.binary, usage_suffix))
+        print(f"Usage: {self.binary} [--core-opts] {usage_suffix}")
         print("")
         print("Core options:")
         print("")
@@ -766,15 +764,14 @@ class Program(object):
                     print(self.leading_indent + line)
                 else:
                     print("")
-            print("")
         else:
-            print(self.leading_indent + "none")
-            print("")
+            print(f"{self.leading_indent}none")
+        print("")
         print("Options:")
         if tuples:
             self.print_columns(tuples)
         else:
-            print(self.leading_indent + "none")
+            print(f"{self.leading_indent}none")
             print("")
 
     def list_tasks(self):
@@ -785,7 +782,7 @@ class Program(object):
             raise Exit(msg.format(focus.name))
         # TODO: now that flat/nested are almost 100% unified, maybe rethink
         # this a bit?
-        getattr(self, "list_{}".format(self.list_format))()
+        getattr(self, f"list_{self.list_format}")()
 
     def list_flat(self):
         pairs = self._make_pairs(self.scoped_collection)
@@ -801,7 +798,7 @@ class Program(object):
             ancestors = []
         pairs = []
         indent = len(ancestors) * self.indent
-        ancestor_path = ".".join(x for x in ancestors)
+        ancestor_path = ".".join(ancestors)
         for name, task in sorted(six.iteritems(coll.tasks)):
             is_default = name == coll.default
             # Start with just the name and just the aliases, no prefixes or
@@ -812,8 +809,8 @@ class Program(object):
             # namespace/root), tack on some dots to make it clear these names
             # require dotted paths to invoke.
             if ancestors or self.list_root:
-                displayname = ".{}".format(displayname)
-                aliases = [".{}".format(x) for x in aliases]
+                displayname = f".{displayname}"
+                aliases = [f".{x}" for x in aliases]
             # Nested? Indent, and add asterisks to default-tasks.
             if self.list_format == "nested":
                 prefix = indent
@@ -827,12 +824,12 @@ class Program(object):
                 # Make sure leading dots are present for subcollections if
                 # scoped display
                 if prefix and self.list_root:
-                    prefix = "." + prefix
+                    prefix = f".{prefix}"
                 aliases = [prefix + alias for alias in aliases]
                 if is_default and ancestors:
                     aliases.insert(0, prefix)
             # Generate full name and help columns and add to pairs.
-            alias_str = " ({})".format(", ".join(aliases)) if aliases else ""
+            alias_str = f' ({", ".join(aliases)})' if aliases else ""
             full = prefix + displayname + alias_str
             pairs.append((full, helpline(task)))
         # Determine whether we're at max-depth or not
@@ -840,14 +837,15 @@ class Program(object):
         for name, subcoll in sorted(six.iteritems(coll.collections)):
             displayname = name
             if ancestors or self.list_root:
-                displayname = ".{}".format(displayname)
+                displayname = f".{displayname}"
             if truncate:
                 tallies = [
-                    "{} {}".format(len(getattr(subcoll, attr)), attr)
+                    f"{len(getattr(subcoll, attr))} {attr}"
                     for attr in ("tasks", "collections")
                     if getattr(subcoll, attr)
                 ]
-                displayname += " [{}]".format(", ".join(tallies))
+
+                displayname += f' [{", ".join(tallies)}]'
             if self.list_format == "nested":
                 pairs.append((indent + displayname, helpline(subcoll)))
             elif self.list_format == "flat" and truncate:
@@ -880,13 +878,13 @@ class Program(object):
     def task_list_opener(self, extra=""):
         root = self.list_root
         depth = self.list_depth
-        specifier = " '{}'".format(root) if root else ""
+        specifier = f" '{root}'" if root else ""
         tail = ""
         if depth or extra:
-            depthstr = "depth={}".format(depth) if depth else ""
+            depthstr = f"depth={depth}" if depth else ""
             joiner = "; " if (depth and extra) else ""
-            tail = " ({}{}{})".format(depthstr, joiner, extra)
-        text = "Available{} tasks{}".format(specifier, tail)
+            tail = f" ({depthstr}{joiner}{extra})"
+        text = f"Available{specifier} tasks{tail}"
         # TODO: do use cases w/ bundled namespace want to display things like
         # root and depth too? Leaving off for now...
         if self.namespace is not None:
@@ -897,16 +895,13 @@ class Program(object):
         root = self.list_root
         print("{}:\n".format(self.task_list_opener(extra=extra)))
         self.print_columns(pairs)
-        # TODO: worth stripping this out for nested? since it's signified with
-        # asterisk there? ugggh
-        default = self.scoped_collection.default
-        if default:
+        if default := self.scoped_collection.default:
             specific = ""
             if root:
-                specific = " '{}'".format(root)
-                default = ".{}".format(default)
+                specific = f" '{root}'"
+                default = f".{default}"
             # TODO: trim/prefix dots
-            print("Default{} task: {}\n".format(specific, default))
+            print(f"Default{specific} task: {default}\n")
 
     def print_columns(self, tuples):
         """
